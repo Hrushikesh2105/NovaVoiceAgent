@@ -1,20 +1,30 @@
 const $ = (id) => document.getElementById(id);
 
+
 const orb = $("orb");
 const statusEl = $("status");
 const transcriptEl = $("transcript");
 const talkButton = $("talk");
 
+
 const BARGE_RMS = 0.02;
+
 
 let ws = null;
 let audioCtx = null;
 let workletNode = null;
 let micStream = null;
 
+
 let nextStart = 0;
 let activeSources = [];
 let speaking = false;
+
+
+// Keeps Nova's current response in one transcript line.
+let currentAssistantLine = null;
+let currentAssistantText = "";
+
 
 
 function setOrb(state) {
@@ -22,12 +32,15 @@ function setOrb(state) {
 }
 
 
+
 function setStatus(text) {
     statusEl.textContent = text;
 }
 
 
+
 function addLine(role, text) {
+
     const line = document.createElement("div");
 
     line.className =
@@ -37,157 +50,308 @@ function addLine(role, text) {
         (role === "assistant" ? "Nova: " : "You: ") + text;
 
     transcriptEl.appendChild(line);
-    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+
+    transcriptEl.scrollTop =
+        transcriptEl.scrollHeight;
+
+    return line;
 }
+
 
 
 // ---------------- AUDIO PLAYBACK ----------------
 
 function playVoice(buffer) {
+
     if (!audioCtx) return;
+
 
     const int16 = new Int16Array(buffer);
 
-    const float32 = new Float32Array(int16.length);
+    const float32 =
+        new Float32Array(int16.length);
+
 
     for (let i = 0; i < int16.length; i++) {
-        float32[i] = int16[i] / 0x8000;
+
+        float32[i] =
+            int16[i] / 0x8000;
     }
 
+
     // Gemini Live audio is 24 kHz PCM.
-    const audioBuffer = audioCtx.createBuffer(
-        1,
-        float32.length,
-        24000
-    );
+    const audioBuffer =
+        audioCtx.createBuffer(
+            1,
+            float32.length,
+            24000
+        );
+
 
     audioBuffer
         .getChannelData(0)
         .set(float32);
 
-    const source = audioCtx.createBufferSource();
+
+    const source =
+        audioCtx.createBufferSource();
+
 
     source.buffer = audioBuffer;
-    source.connect(audioCtx.destination);
 
-    const now = audioCtx.currentTime;
+    source.connect(
+        audioCtx.destination
+    );
+
+
+    const now =
+        audioCtx.currentTime;
+
 
     if (nextStart < now) {
         nextStart = now;
     }
 
+
     source.start(nextStart);
 
-    nextStart += audioBuffer.duration;
+
+    nextStart +=
+        audioBuffer.duration;
+
 
     activeSources.push(source);
 
+
     source.onended = () => {
+
         activeSources =
-            activeSources.filter((item) => item !== source);
+            activeSources.filter(
+                (item) => item !== source
+            );
+
 
         if (activeSources.length === 0) {
+
             speaking = false;
+
             setOrb("listening");
         }
     };
 
+
     speaking = true;
+
     setOrb("speaking");
 }
+
 
 
 // ---------------- BARGE-IN ----------------
 
 function stopVoice() {
-    activeSources.forEach((source) => {
-        try {
-            source.stop();
-        } catch {
-            // Already stopped.
+
+    activeSources.forEach(
+        (source) => {
+
+            try {
+                source.stop();
+            } catch {
+                // Already stopped.
+            }
         }
-    });
+    );
+
 
     activeSources = [];
+
     nextStart = 0;
+
     speaking = false;
+
 
     setOrb("listening");
 }
 
 
+
 // ---------------- WEBSOCKET ----------------
 
 function connect() {
+
     const protocol =
-        location.protocol === "https:" ? "wss" : "ws";
+        location.protocol === "https:"
+            ? "wss"
+            : "ws";
+
 
     ws = new WebSocket(
         `${protocol}://${location.host}/ws`
     );
 
-    ws.binaryType = "arraybuffer";
+
+    ws.binaryType =
+        "arraybuffer";
+
 
 
     ws.onopen = () => {
+
         setStatus("Listening...");
+
         setOrb("listening");
     };
 
 
+
     ws.onclose = () => {
-        setStatus("Connection closed. Refresh to reconnect.");
+
+        setStatus(
+            "Connection closed. Refresh to reconnect."
+        );
+
         setOrb("idle");
     };
 
 
+
     ws.onerror = () => {
-        setStatus("Connection error.");
+
+        setStatus(
+            "Connection error."
+        );
     };
+
 
 
     ws.onmessage = (event) => {
 
+
         // Binary data = Gemini voice audio
-        if (typeof event.data !== "string") {
+        if (
+            typeof event.data !== "string"
+        ) {
+
             playVoice(event.data);
+
             return;
         }
 
 
-        const message = JSON.parse(event.data);
+
+        const message =
+            JSON.parse(event.data);
 
 
-        // Transcript
-        if (message.type === "transcript") {
 
-            if (message.role === "user") {
+        // ---------------- TRANSCRIPT ----------------
+
+        if (
+            message.type === "transcript"
+        ) {
+
+
+            // USER MESSAGE
+            if (
+                message.role === "user"
+            ) {
+
                 setOrb("thinking");
+
+
+                // A new user message means
+                // Nova will start a new response.
+                currentAssistantLine = null;
+
+                currentAssistantText = "";
+
+
+                addLine(
+                    "user",
+                    message.text
+                );
             }
 
-            addLine(
-                message.role,
-                message.text
-            );
+
+
+            // NOVA MESSAGE
+            else if (
+                message.role === "assistant"
+            ) {
+
+
+                // First transcript update
+                // for this Nova response.
+                if (
+                    !currentAssistantLine
+                ) {
+
+                    currentAssistantText =
+                        message.text;
+
+
+                    currentAssistantLine =
+                        addLine(
+                            "assistant",
+                            currentAssistantText
+                        );
+                }
+
+
+
+                // Gemini may send multiple
+                // transcript updates.
+                // Update the SAME line instead
+                // of creating another line.
+                else {
+
+                    currentAssistantText =
+                        message.text;
+
+
+                    currentAssistantLine.textContent =
+                        "Nova: " +
+                        currentAssistantText;
+
+
+                    transcriptEl.scrollTop =
+                        transcriptEl.scrollHeight;
+                }
+            }
         }
 
 
-        // Gemini interruption
-        else if (message.type === "interrupted") {
+
+        // ---------------- GEMINI INTERRUPTION ----------------
+
+        else if (
+            message.type === "interrupted"
+        ) {
+
             stopVoice();
         }
 
 
-        // Error
-        else if (message.type === "error") {
+
+        // ---------------- ERROR ----------------
+
+        else if (
+            message.type === "error"
+        ) {
+
             setStatus(
-                "Error: " + message.message
+                "Error: " +
+                message.message
             );
 
-            console.error(message.message);
+
+            console.error(
+                message.message
+            );
         }
     };
 }
+
 
 
 // ---------------- MICROPHONE ----------------
@@ -201,26 +365,35 @@ async function startMic() {
         )();
 
 
+
     await audioCtx.audioWorklet.addModule(
         "/pcm-processor.js"
     );
 
 
+
     micStream =
         await navigator.mediaDevices.getUserMedia({
+
             audio: {
+
                 channelCount: 1,
+
                 echoCancellation: true,
+
                 noiseSuppression: true,
+
                 autoGainControl: true
             }
         });
+
 
 
     const source =
         audioCtx.createMediaStreamSource(
             micStream
         );
+
 
 
     workletNode =
@@ -230,32 +403,49 @@ async function startMic() {
         );
 
 
-    workletNode.port.onmessage = (event) => {
 
-        const pcm = event.data.pcm;
-        const rms = event.data.rms;
+    workletNode.port.onmessage =
+        (event) => {
 
+            const pcm =
+                event.data.pcm;
 
-        // Send microphone PCM to Gemini through the server.
-        if (
-            ws &&
-            ws.readyState === WebSocket.OPEN
-        ) {
-            ws.send(pcm);
-        }
+            const rms =
+                event.data.rms;
 
 
-        // Stop Nova immediately when the user starts speaking.
-        if (
-            rms >= BARGE_RMS &&
-            speaking
-        ) {
-            stopVoice();
-        }
-    };
+
+            // Send microphone PCM
+            // to Gemini through the server.
+            if (
+                ws &&
+                ws.readyState ===
+                    WebSocket.OPEN
+            ) {
+
+                ws.send(pcm);
+            }
 
 
-    source.connect(workletNode);
+
+            // Stop Nova immediately
+            // when the user starts speaking.
+            if (
+                rms >= BARGE_RMS &&
+                speaking
+            ) {
+
+                stopVoice();
+            }
+        };
+
+
+
+    source.connect(
+        workletNode
+    );
+
+
 
     // Keeps the AudioWorklet processing.
     workletNode.connect(
@@ -264,14 +454,22 @@ async function startMic() {
 }
 
 
+
 // ---------------- START ----------------
 
 async function startNova() {
 
     talkButton.disabled = true;
 
-    setStatus("Starting Nova...");
-    setOrb("thinking");
+
+    setStatus(
+        "Starting Nova..."
+    );
+
+
+    setOrb(
+        "thinking"
+    );
 
 
     try {
@@ -280,21 +478,33 @@ async function startNova() {
 
         connect();
 
-        talkButton.textContent = "● Live";
 
-    } catch (error) {
+        talkButton.textContent =
+            "● Live";
+
+    }
+
+
+    catch (error) {
 
         console.error(error);
+
 
         setStatus(
             "Microphone permission is required."
         );
 
-        setOrb("idle");
 
-        talkButton.disabled = false;
+        setOrb(
+            "idle"
+        );
+
+
+        talkButton.disabled =
+            false;
     }
 }
+
 
 
 talkButton.addEventListener(
