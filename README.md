@@ -53,3 +53,48 @@ The project uses **Google ADK** and the **Gemini Live API** to process live audi
 Here is Nova running in the browser:
 
 ![Nova Voice Assistant Demo](screenshots/nova-demo.png)
+
+
+
+## 🚀 How to Run
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Hrushikesh2105/NovaVoiceAgent.git
+cd NovaVoiceAgent
+```
+
+### 2. Install dependencies
+
+```bash
+uv sync
+```
+
+### 3. Add your Gemini API key
+
+Create a `.env` file in the project folder:
+
+```env
+GOOGLE_API_KEY=your_api_key_here
+```
+
+### 4. Start Nova
+
+```bash
+uv run uvicorn server:app --host 127.0.0.1 --port 8000
+```
+
+### 5. Open Nova
+
+Open the following URL in your browser:
+
+```text
+http://127.0.0.1:8000/
+```
+
+## ⚠️ Security Note
+
+Never upload your `.env` file or expose your Gemini API key publicly.
+
+The API key should be stored securely in the `.env` file.
