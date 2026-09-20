@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nova Voice Assistant</title>
+
+  <style>
+    :root {
+      --accent: #8ab4f8;
+      --text: #e8eaed;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: system-ui, sans-serif;
+      background: #101114;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header {
+      width: 100%;
+      padding: 24px;
+      display: flex;
+      justify-content: space-between;
+      color: #777;
+      font-size: 12px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+    }
+
+    .orb {
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      background:
+        radial-gradient(
+          circle at 35% 35%,
+          #ffffff 0%,
+          #8ab4f8 40%,
+          #7e57c2 70%,
+          transparent 100%
+        );
+      filter: blur(3px);
+      opacity: 0.6;
+    }
+
+    .orb.idle {
+      animation: breathe 4s infinite;
+    }
+
+    .orb.listening {
+      animation: pulse 1.5s infinite;
+    }
+
+    .orb.thinking {
+      opacity: 0.45;
+    }
+
+    .orb.speaking {
+      animation: speak 1.5s infinite;
+      opacity: 0.9;
+    }
+
+    @keyframes breathe {
+      50% {
+        transform: scale(1.05);
+      }
+    }
+
+    @keyframes pulse {
+      50% {
+        transform: scale(1.08);
+      }
+    }
+
+    @keyframes speak {
+      50% {
+        transform: scale(1.12);
+      }
+    }
+
+    .status {
+      font-size: 15px;
+      color: #aaa;
+      min-height: 20px;
+    }
+
+    .info {
+      width: 100%;
+      padding: 20px 28px 30px;
+      text-align: center;
+    }
+
+    .transcript {
+      max-width: 600px;
+      margin: 10px auto;
+      max-height: 120px;
+      overflow-y: auto;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #aaa;
+      text-align: left;
+    }
+
+    .line.assistant {
+      color: var(--accent);
+    }
+
+    button {
+      margin-top: 14px;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid #555;
+      border-radius: 999px;
+      padding: 12px 24px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+    }
+
+    button:disabled {
+      opacity: 0.7;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="header">
+    <span>Nova</span>
+    <span>Voice Assistant</span>
+  </div>
+
+  <div class="stage">
+    <div id="orb" class="orb idle"></div>
+    <div id="status" class="status">
+      Tap the button and talk to Nova
+    </div>
+  </div>
+
+  <div class="info">
+    <div id="transcript" class="transcript"></div>
+
+    <button id="talk">
+      🎙 Talk to Nova
+    </button>
+  </div>
+
+  <script src="/main.js"></script>
+
+</body>
+</html>
